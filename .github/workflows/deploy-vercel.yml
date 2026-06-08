@@ -41,8 +41,61 @@ jobs:
       - name: 7. Pull Vercel Environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: 8. Build Project Artifacts
+      - name: 8. Verify Pulled Vercel Environment
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+
+          const file = '.vercel/.env.production.local';
+
+          if (!fs.existsSync(file)) {
+            console.error(`${file} does not exist`);
+            process.exit(1);
+          }
+
+          const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+          const env = new Map();
+
+          for (const line of lines) {
+            if (!line || line.startsWith('#')) continue;
+
+            const index = line.indexOf('=');
+            if (index === -1) continue;
+
+            const key = line.slice(0, index);
+            let value = line.slice(index + 1);
+
+            if (
+              (value.startsWith('"') && value.endsWith('"')) ||
+              (value.startsWith("'") && value.endsWith("'"))
+            ) {
+              value = value.slice(1, -1);
+            }
+
+            env.set(key, value);
+          }
+
+          console.log(`pulled env keys: ${env.size}`);
+
+          const keyVaultsSecret = env.get('KEY_VAULTS_SECRET');
+
+          if (!keyVaultsSecret) {
+            console.error('KEY_VAULTS_SECRET: missing from pulled Vercel env');
+            process.exit(1);
+          }
+
+          const decodedLength = Buffer.from(keyVaultsSecret, 'base64').length;
+
+          console.log(`KEY_VAULTS_SECRET: present, valueLength=${keyVaultsSecret.length}, decodedBytes=${decodedLength}`);
+
+          if (![16, 24, 32].includes(decodedLength)) {
+            console.error('KEY_VAULTS_SECRET: invalid base64 AES key length');
+            process.exit(1);
+          }
+          NODE
+
+      - name: 9. Build Project Artifacts
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: 9. Deploy to Vercel
+      - name: 10. Deploy to Vercel
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
