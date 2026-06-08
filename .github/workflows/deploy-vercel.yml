@@ -77,10 +77,15 @@ jobs:
 
           console.log(`pulled env keys: ${env.size}`);
 
+          if (!env.has('KEY_VAULTS_SECRET')) {
+            console.error('KEY_VAULTS_SECRET: missing key from pulled Vercel env');
+            process.exit(1);
+          }
+
           const keyVaultsSecret = env.get('KEY_VAULTS_SECRET');
 
           if (!keyVaultsSecret) {
-            console.error('KEY_VAULTS_SECRET: missing from pulled Vercel env');
+            console.error('KEY_VAULTS_SECRET: present in pulled Vercel env, but value is empty');
             process.exit(1);
           }
 
